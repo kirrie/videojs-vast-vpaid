@@ -302,11 +302,38 @@ VASTIntegrator.prototype._addClickThrough = function addClickThrough(mediaFile, 
   }
 };
 
+// when video started to play with videojs flash tech, no 'seeked' event fired.
+// (https://github.com/videojs/video-js-swf/issues/115)
+// i'm not sure that it is a bug or not, but not firing 'seeked' event looks like
+// causing that player.currentTime() returns 0.
+// so make it fired manually.
+//
+// i think this is not proper way to approach. videojs team does not recommand
+// to access "tech" thing in plugins. but there is no way to make it work except this now.
+var triggerSeekedEventOnce = (function() {
+		var func = [function(player) {
+				if(player.tech_.options_.techId.indexOf('Flash') >= 0) {
+					player.tech_.trigger('seeked');
+				}
+			}];
+
+		return function(player) {
+			var trigger = func.shift();
+
+			if(trigger) {
+				trigger(player);
+			}
+		};
+	})();
+
 VASTIntegrator.prototype._playSelectedAd = function playSelectedAd(source, response, callback) {
   var player = this.player;
 
   player.preload("auto"); //without preload=auto the durationchange event is never fired
   player.src(source);
+
+  // this function runs once even if called repeartedly.
+  triggerSeekedEventOnce(player);
 
   logger.debug ("<VASTIntegrator._playSelectedAd> waiting for durationchange to play the ad...");
 
